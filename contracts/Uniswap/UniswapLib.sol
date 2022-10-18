@@ -40,6 +40,7 @@ library UniswapV2OracleLibrary {
     }
 
     // produces the cumulative price using counterfactuals to save gas and avoid a call to sync.
+    // 当前Pari累计价格
     function currentCumulativePrices(
         address pair
     ) internal view returns (uint price0Cumulative, uint price1Cumulative, uint32 blockTimestamp) {

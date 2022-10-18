@@ -9,7 +9,7 @@ pragma experimental ABIEncoderV2;
  */
 contract OpenOracleData {
     /**
-     * @notice The event emitted when a source writes to its storage
+     * @notice The event emitted when a source writes to its storage 源数据写到存储事件
      */
     //event Write(address indexed source, <Key> indexed key, string kind, uint64 timestamp, <Value> value);
 
@@ -30,7 +30,7 @@ contract OpenOracleData {
     //function get(address source, <Key> key) external view returns (uint, <Value>);
 
     /**
-     * @notice Recovers the source address which signed a message
+     * @notice Recovers the source address which signed a message 从签名消息中恢复签名者
      * @dev Comparing to a claimed address would add nothing,
      *  as the caller could simply perform the recover and claim that address.
      * @param message The data that was presumably signed

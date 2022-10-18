@@ -7,6 +7,7 @@ import "../OpenOraclePriceData.sol";
 import "./UniswapConfig.sol";
 import "./UniswapLib.sol";
 
+//观察点
 struct Observation {
     uint timestamp;
     uint acc;
@@ -15,59 +16,61 @@ struct Observation {
 contract UniswapAnchoredView is UniswapConfig {
     using FixedPoint for *;
 
-    /// @notice The Open Oracle Price Data contract
+    /// @notice The Open Oracle Price Data contract  开放语言价格数据
     OpenOraclePriceData public immutable priceData;
 
-    /// @notice The number of wei in 1 ETH
+    /// @notice The number of wei in 1 ETH EHT的wei数量
     uint public constant ethBaseUnit = 1e18;
 
-    /// @notice A common scaling factor to maintain precision
+    /// @notice A common scaling factor to maintain precision 维护价格的精度
     uint public constant expScale = 1e18;
 
-    /// @notice The Open Oracle Reporter
+    /// @notice The Open Oracle Reporter 开放预言报告地址
     address public immutable reporter;
 
-    /// @notice The highest ratio of the new price to the anchor price that will still trigger the price to be updated
+    /// @notice The highest ratio of the new price to the anchor price that will still trigger the price to be updated 价格发生变化的上限
     uint public immutable upperBoundAnchorRatio;
 
-    /// @notice The lowest ratio of the new price to the anchor price that will still trigger the price to be updated
+    /// @notice The lowest ratio of the new price to the anchor price that will still trigger the price to be updated 价格发生变化的下限
     uint public immutable lowerBoundAnchorRatio;
 
-    /// @notice The minimum amount of time in seconds required for the old uniswap price accumulator to be replaced
+    /// @notice The minimum amount of time in seconds required for the old uniswap price accumulator to be replaced 价格监测最小间隔
     uint public immutable anchorPeriod;
 
-    /// @notice Official prices by symbol hash
+    /// @notice Official prices by symbol hash 官方价格
     mapping(bytes32 => uint) public prices;
 
-    /// @notice Circuit breaker for using anchor price oracle directly, ignoring reporter
+    /// @notice Circuit breaker for using anchor price oracle directly, ignoring reporter 短路器，直接使用预言基准价格，忽略无效报告
     bool public reporterInvalidated;
 
-    /// @notice The old observation for each symbolHash
+    /// @notice The old observation for each symbolHash 每个资产的老观察点
     mapping(bytes32 => Observation) public oldObservations;
 
-    /// @notice The new observation for each symbolHash
+    /// @notice The new observation for each symbolHash 每个资产的新观察点
     mapping(bytes32 => Observation) public newObservations;
 
-    /// @notice The event emitted when new prices are posted but the stored price is not updated due to the anchor
+    /// @notice The event emitted when new prices are posted but the stored price is not updated due to the anchor 新价格产生，并没有触发价格存储变更
+    /// 价格保护事件
     event PriceGuarded(string symbol, uint reporter, uint anchor);
 
-    /// @notice The event emitted when the stored price is updated
+    /// @notice The event emitted when the stored price is updated 价格更新
     event PriceUpdated(string symbol, uint price);
 
-    /// @notice The event emitted when anchor price is updated
+    /// @notice The event emitted when anchor price is updated 基准价格变更
     event AnchorPriceUpdated(string symbol, uint anchorPrice, uint oldTimestamp, uint newTimestamp);
 
-    /// @notice The event emitted when the uniswap window changes
+    /// @notice The event emitted when the uniswap window changes  uniswap窗口变更事件
     event UniswapWindowUpdated(bytes32 indexed symbolHash, uint oldTimestamp, uint newTimestamp, uint oldPrice, uint newPrice);
 
     /// @notice The event emitted when reporter invalidates itself
     event ReporterInvalidated(address reporter);
 
-    bytes32 constant ethHash = keccak256(abi.encodePacked("ETH"));
+    bytes32 constant ethHash = keccak256(abi.encodePacked("ETH")); //eth
     bytes32 constant rotateHash = keccak256(abi.encodePacked("rotate"));
 
     /**
      * @notice Construct a uniswap anchored view for a set of token configurations
+     * 构造一个基于Uniwap的价格预言机视图
      * @dev Note that to avoid immature TWAPs, the system must run for at least a single anchorPeriod before using.
      * @param reporter_ The reporter whose prices are to be used
      * @param anchorToleranceMantissa_ The percentage tolerance that the reporter may deviate from the uniswap anchor
@@ -94,6 +97,7 @@ contract UniswapAnchoredView is UniswapConfig {
             if (config.priceSource == PriceSource.REPORTER) {
                 require(uniswapMarket != address(0), "reported prices must have an anchor");
                 bytes32 symbolHash = config.symbolHash;
+                //获取当前价格
                 uint cumulativePrice = currentCumulativePrice(config);
                 oldObservations[symbolHash].timestamp = block.timestamp;
                 newObservations[symbolHash].timestamp = block.timestamp;
@@ -107,7 +111,7 @@ contract UniswapAnchoredView is UniswapConfig {
     }
 
     /**
-     * @notice Get the official price for a symbol
+     * @notice Get the official price for a symbol 获取代币价格
      * @param symbol The symbol to fetch the price of
      * @return Price denominated in USD, with 6 decimals
      */
@@ -119,7 +123,7 @@ contract UniswapAnchoredView is UniswapConfig {
     function priceInternal(TokenConfig memory config) internal view returns (uint) {
         if (config.priceSource == PriceSource.REPORTER) return prices[config.symbolHash];
         if (config.priceSource == PriceSource.FIXED_USD) return config.fixedPrice;
-        if (config.priceSource == PriceSource.FIXED_ETH) {
+        if (config.priceSource == PriceSource.FIXED_ETH) {//eth
             uint usdPerEth = prices[ethHash];
             require(usdPerEth > 0, "ETH price not set, cannot convert to dollars");
             return mul(usdPerEth, config.fixedPrice) / ethBaseUnit;
@@ -127,7 +131,7 @@ contract UniswapAnchoredView is UniswapConfig {
     }
 
     /**
-     * @notice Get the underlying price of a cToken
+     * @notice Get the underlying price of a cToken 获取底层资产价格
      * @dev Implements the PriceOracle interface for Compound v2.
      * @param cToken The cToken address for price retrieval
      * @return Price denominated in USD, with 18 decimals, for the given cToken address
@@ -141,6 +145,7 @@ contract UniswapAnchoredView is UniswapConfig {
 
     /**
      * @notice Post open oracle reporter prices, and recalculate stored price by comparing to anchor
+     * 邮寄开放的Oracle报告价格
      * @dev We let anyone pay to post anything, but only prices from configured reporter will be stored in the view.
      * @param messages The messages to post to the oracle
      * @param signatures The signatures for the corresponding messages
@@ -172,20 +177,23 @@ contract UniswapAnchoredView is UniswapConfig {
         if (symbolHash == ethHash) {
             anchorPrice = ethPrice;
         } else {
+            //抓取基准价格
             anchorPrice = fetchAnchorPrice(symbol, config, ethPrice);
         }
 
-        if (reporterInvalidated) {
+        if (reporterInvalidated) {//报告无效
             prices[symbolHash] = anchorPrice;
             emit PriceUpdated(symbol, anchorPrice);
-        } else if (isWithinAnchor(reporterPrice, anchorPrice)) {
+        } else if (isWithinAnchor(reporterPrice, anchorPrice)) {//价格波动
             prices[symbolHash] = reporterPrice;
             emit PriceUpdated(symbol, reporterPrice);
-        } else {
+        } else {//价格没有变化
             emit PriceGuarded(symbol, reporterPrice, anchorPrice);
         }
     }
-
+    /**
+     * 是否在价格允许范围内
+     */
     function isWithinAnchor(uint reporterPrice, uint anchorPrice) internal view returns (bool) {
         if (reporterPrice > 0) {
             uint anchorRatio = mul(anchorPrice, 100e16) / reporterPrice;
@@ -196,6 +204,7 @@ contract UniswapAnchoredView is UniswapConfig {
 
     /**
      * @dev Fetches the current token/eth price accumulator from uniswap.
+     * 从uniswap抓取token与eth对的Oracle价格
      */
     function currentCumulativePrice(TokenConfig memory config) internal view returns (uint) {
         (uint cumulativePrice0, uint cumulativePrice1,) = UniswapV2OracleLibrary.currentCumulativePrices(config.uniswapMarket);
@@ -215,7 +224,7 @@ contract UniswapAnchoredView is UniswapConfig {
     }
 
     /**
-     * @dev Fetches the current token/usd price from uniswap, with 6 decimals of precision.
+     * @dev Fetches the current token/usd price from uniswap, with 6 decimals of precision. 抓取token/usd价格
      * @param conversionFactor 1e18 if seeking the ETH price, and a 6 decimal ETH-USDC price in the case of other assets
      */
     function fetchAnchorPrice(string memory symbol, TokenConfig memory config, uint conversionFactor) internal virtual returns (uint) {
@@ -251,7 +260,8 @@ contract UniswapAnchoredView is UniswapConfig {
     }
 
     /**
-     * @dev Get time-weighted average prices for a token at the current timestamp.
+     * @dev Get time-weighted average prices for a token at the current timestamp. 
+     * 获取基于TWAP的token资产价格
      *  Update new and old observations of lagging window if period elapsed.
      */
     function pokeWindowValues(TokenConfig memory config) internal returns (uint, uint, uint) {
@@ -262,7 +272,7 @@ contract UniswapAnchoredView is UniswapConfig {
 
         // Update new and old observations if elapsed time is greater than or equal to anchor period
         uint timeElapsed = block.timestamp - newObservation.timestamp;
-        if (timeElapsed >= anchorPeriod) {
+        if (timeElapsed >= anchorPeriod) {//更新观察点
             oldObservations[symbolHash].timestamp = newObservation.timestamp;
             oldObservations[symbolHash].acc = newObservation.acc;
 
@@ -275,6 +285,7 @@ contract UniswapAnchoredView is UniswapConfig {
 
     /**
      * @notice Invalidate the reporter, and fall back to using anchor directly in all cases
+     * 失效价格报告，回退到直接使用基准价格
      * @dev Only the reporter may sign a message which allows it to invalidate itself.
      *  To be used in cases of emergency, if the reporter thinks their key may be compromised.
      * @param message The data that was presumably signed

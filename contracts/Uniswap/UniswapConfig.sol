@@ -8,31 +8,31 @@ interface CErc20 {
 }
 
 contract UniswapConfig {
-    /// @dev Describe how to interpret the fixedPrice in the TokenConfig.
+    /// @dev Describe how to interpret the fixedPrice in the TokenConfig. 价格源
     enum PriceSource {
-        FIXED_ETH, /// implies the fixedPrice is a constant multiple of the ETH price (which varies)
-        FIXED_USD, /// implies the fixedPrice is a constant multiple of the USD price (which is 1)
+        FIXED_ETH, /// implies the fixedPrice is a constant multiple of the ETH price (which varies)    EHT价格源
+        FIXED_USD, /// implies the fixedPrice is a constant multiple of the USD price (which is 1)   USD价格源
         REPORTER   /// implies the price is set by the reporter
     }
 
-    /// @dev Describe how the USD price should be determined for an asset.
+    /// @dev Describe how the USD price should be determined for an asset. 描述如何使用USD衡量一个资产
     ///  There should be 1 TokenConfig object for each supported asset, passed in the constructor.
     struct TokenConfig {
-        address cToken;
-        address underlying;
+        address cToken;//cToken地址
+        address underlying;//底层资产地址
         bytes32 symbolHash;
         uint256 baseUnit;
-        PriceSource priceSource;
+        PriceSource priceSource; //价格源
         uint256 fixedPrice;
-        address uniswapMarket;
+        address uniswapMarket; //uniswap合约地址
         bool isUniswapReversed;
     }
 
-    /// @notice The max number of tokens this contract is hardcoded to support
+    /// @notice The max number of tokens this contract is hardcoded to support 支持的最大Token数量
     /// @dev Do not change this variable without updating all the fields throughout the contract.
     uint public constant maxTokens = 30;
 
-    /// @notice The number of tokens this contract actually supports
+    /// @notice The number of tokens this contract actually supports 支持的token数量
     uint public immutable numTokens;
 
     address internal immutable cToken00;
@@ -539,7 +539,7 @@ contract UniswapConfig {
         isUniswapReversed28 = get(configs, 28).isUniswapReversed;
         isUniswapReversed29 = get(configs, 29).isUniswapReversed;
     }
-
+    //获取token配置
     function get(TokenConfig[] memory configs, uint i) internal pure returns (TokenConfig memory) {
         if (i < configs.length)
             return configs[i];
